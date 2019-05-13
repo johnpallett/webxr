@@ -1,3 +1,10 @@
+## Note
+The goal of this design is to protect user privacy when data from the WebXR Device API is made available to web sites.
+To accomplish this, mitigations (including but not limited to user consent) are outlined as either requirements or recommendations before allowing sites to access different types of data. An explanation of the mitigations and corresponding threat vectors can be found in the Background section.
+
+There is no distinction between different WebXR modes in this document. Data access requirements are the same whether the session is inline, immersive, or otherwise. If a user agent wants to avoid user consent for a particular type of session, the user agent should meet the requirements for all data available in that session. _For example, user agents that limit inline sessions to identity reference spaces only or apply necessary mitigations (such as data quantization) to eye-level and floor-level reference spaces may still offer them without first obtaining user consent._
+
+
 ## Privacy Requirements
 ### Conditions to create objects and expose data
 #### XRSession Creation
