@@ -68,7 +68,7 @@ The **_mandatory conditions_** for creating an XRReferenceSpace are the followin
     *   Enforce the same [position limiting](https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#position-limiting) bounds for [XRViewerPose](https://immersive-web.github.io/webxr/#xrviewerpose-interface) data within all those sessions, and require that all [effective origins](https://immersive-web.github.io/webxr/#xrspace-effective-origin) fall within those bounds.
 
 ### Obtaining User Consent
-The implementation of user consent is a mandatory condition for some types of object creation and data access. In addition to general [considerations](https://github.com/immersive-web/privacy-and-security/blob/master/EXPLAINER.md#considerations) for obtaining user consent, the following considerations are specific to the WebXR Device API.
+Acquiring user consent is a mandatory condition for some types of object creation and data access. In addition to general [considerations](https://github.com/immersive-web/privacy-and-security/blob/master/EXPLAINER.md#considerations) for obtaining user consent, the following considerations are specific to the WebXR Device API.
 
 #### Lifetime of Consent
 The following guidelines are suggested:
