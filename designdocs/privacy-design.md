@@ -3,7 +3,7 @@ This design adopts the [requirements of the Generic Sensors API](https://www.w3.
 
 Further, when allowing access to any sensor-based data (ex. poses) or user configurable data (ex. IPD, bounds), the user agent must either apply all necessary mitigations to ensure user privacy, or obtain user consent at session creation in response to requestSession().
 
-In some scenarios, mitigations may not be sufficient to ensure user privacy. In those situations, user consent is required. For example, user consent is always required when exposing data that might allow a site to profile the user.
+In some scenarios, mitigations may not be sufficient to ensure user privacy. In those situations, user consent is required. For example, user consent is always required when exposing data that might allow a site to profile the user. A summary of scenarios where user consent is required can be found under [User Communication](#user-communication).
 
 User consent must be requested only in response to requestSession(). It is recommended that consent last as long as the browsing context. User consent cannot be obtained during an active session, as there is no known approach for a trusted user interface that works consistently across all platforms during an active session.
 
@@ -99,9 +99,9 @@ The judgement on how to communicate to the user the known threats is up to the i
 
 <table>
   <tr>
-   <td><strong>Scenario</strong>
+   <td><strong>User consent is required if...</strong>
    </td>
-   <td><strong>Threat Vector</strong>
+   <td><strong>Why user consent is required</strong>
    </td>
   </tr>
   <tr>
@@ -110,14 +110,26 @@ The judgement on how to communicate to the user the known threats is up to the i
    <td>Site may be able to determine user’s specific geographic <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-location">location</a>, and may be able to perform gait analysis, allowing user <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-profiling">profiling</a> and <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-fingerprinting">fingerprinting</a>.
    </td>
   </tr>
+   <tr>
+   <td>XRSession can create an <a href="https://immersive-web.github.io/webxr/#xrspace-interface">XRSpace</a> and <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#position-limiting">position limiting</a> is not applied.
+   </td>
+   <td>Site may be able to determine user’s specific geographic <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-location">location</a>.
+   </td>
+  </tr>
+ <tr>
+   <td>XRSession can create multiple <a href="https://immersive-web.github.io/webxr/#xrspace-interface">XRSpace</a> objects with different <a href="https://immersive-web.github.io/webxr/#xrspace-native-origin">native origins</a> and suitable <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#position-limiting">position limiting</a> is not applied.
+   </td>
+   <td>Site may be able to determine user’s specific geographic <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-location">location</a>.
+   </td>
+  </tr>  
   <tr>
-   <td>XRSession can create a <a href="https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-local-floor">local-floor</a> or <a href="https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-bounded-floor">bounded-floor</a> reference space, and the origin of the reference space will reflect the real-world location of the user’s floor.
+   <td>XRSession can create a <a href="https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-local-floor">local-floor</a> or <a href="https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-bounded-floor">bounded-floor</a> reference space, where the origin of the reference space reflects the real-world location of the user’s floor.
    </td>
    <td>Site may be able to infer the user’s height and may be able to perform gait analysis, allowing user <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-profiling">profiling</a> and <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-fingerprinting">fingerprinting</a>.
    </td>
   </tr>
   <tr>
-   <td>XRSession may provide <a href="https://immersive-web.github.io/webxr/#xrviewerpose">XRViewerPose</a> data that is not quantized, and underlying device sensors may be susceptible to fingerprinting.
+   <td>XRSession can provide <a href="https://immersive-web.github.io/webxr/#xrviewerpose">XRViewerPose</a> data that is not quantized, and underlying device sensors may be susceptible to fingerprinting.
    </td>
    <td>Site may be able to perform user <a href="https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-fingerprinting">fingerprinting</a>.
    </td>
