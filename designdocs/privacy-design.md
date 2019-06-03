@@ -1,7 +1,7 @@
 ## Summary
 This design adopts the [requirements of the Generic Sensors API](https://www.w3.org/TR/generic-sensor/#concepts-can-expose-sensor-readings) when exposing data based on sensors.
 
-Further, before allowing access to any sensor-based data (ex. poses) or user configurable data (ex. IPD, bounds), the user agent must either apply all necessary mitigations to ensure user privacy, or obtain user consent at session creation in response to requestSession().
+Further, when allowing access to any sensor-based data (ex. poses) or user configurable data (ex. IPD, bounds), the user agent must either apply all necessary mitigations to ensure user privacy, or obtain user consent at session creation in response to requestSession().
 
 In some scenarios, mitigations may not be sufficient to ensure user privacy. In those situations, user consent is required. For example, user consent is always required when exposing data that might allow a site to profile the user.
 
@@ -17,7 +17,9 @@ Not all sessions require user consent, such as:
 *   Sessions that fully mitigate sensor-based privacy concerns (ex. pose quantization and position bounds) and which do not include user-configured data that could be used for profiling.
 
 ## Note
-There is no distinction between different WebXR modes in this document. Data access requirements are the same whether the session is inline, immersive, or otherwise. If a user agent wants to avoid user consent for a particular type of session, the user agent should meet the requirements for all data available in that session. _For example, if in an inline session a user agent only supports the [viewer](https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-viewer) reference space, does not support other forms of sensor-based data (e.g. from a 6DOF controller), and does not support multiple views, then all privacy requirements below have been met and user consent is not required for that session._
+There is no distinction between different WebXR modes in this document. The requirements to expose any given data type are the same whether the session is inline, immersive, or otherwise. If a user agent wants to avoid user consent for a particular type of session, the user agent must meet the mitigation requirements to expose all of the data types available in that session.
+
+However, not all modes and platforms support all types of data, and some mitigation strategies that work in one mode may not work in other modes or on other platforms. As a result, the actual requirements for each mode and platform will vary. For example, if in an inline session a user agent only supports the [viewer](https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-viewer) reference space, does not support other forms of sensor-based data (e.g. from a 6DOF controller), and does not support multiple views, then all privacy requirements have been met and user consent is not required for that session. In contrast, an immersive session supporting the [unbounded](https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-unbounded) reference space type with a native origin that is tracked using sensors would have different requirements for user consent and privacy mitigations. 
 
 
 ## Privacy Requirements
