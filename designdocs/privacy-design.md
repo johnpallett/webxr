@@ -1,8 +1,23 @@
-## Note
-The goal of this design is to protect user privacy when data from the WebXR Device API is made available to web sites.
-To accomplish this, mitigations (including but not limited to user consent) are outlined as either requirements or recommendations before allowing sites to access different types of data. An explanation of the mitigations and corresponding threat vectors can be found in the Background section.
+## Summary
+This design adopts the [requirements of the Generic Sensors API](https://www.w3.org/TR/generic-sensor/#concepts-can-expose-sensor-readings) when exposing data based on sensors.
 
-There is no distinction between different WebXR modes in this document. Data access requirements are the same whether the session is inline, immersive, or otherwise. If a user agent wants to avoid user consent for a particular type of session, the user agent should meet the requirements for all data available in that session. _For example, if in an inline session a user agent only supports the [viewer](https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-viewer) reference space, does not support other forms of sensor-based spaces (e.g. from a 6DOF controller), and does not support multiple views, then all privacy requirements below have been met and user consent is not required for that session._
+Further, before allowing access to any sensor-based data (ex. poses) or user configurable data (ex. IPD, bounds), the user agent must either apply all necessary mitigations to ensure user privacy, or obtain user consent at session creation in response to requestSession().
+
+In some scenarios, mitigations may not be sufficient to ensure user privacy. In those situations, user consent is required. For example, user consent is always required when exposing data that might allow a site to profile the user.
+
+User consent must be requested only in response to requestSession(). It is recommended that consent last as long as the browsing context. User consent cannot be obtained during an active session, as there is no known approach for a trusted user interface that works consistently across all platforms during an active session.
+
+When creating a session, all privacy-sensitive data that could be exposed during that session must be considered when determining whether or not user consent is required. If user consent is not granted for a particular data type, then either:
+*   Other mitigations for that data type must be applied to ensure user privacy, or
+*   Any feature that would expose that data type must be disabled, or
+*   The session request must be rejected.
+
+Not all sessions require user consent, such as:
+*   Sessions that do not include any sensor-based or user-configured data;
+*   Sessions that fully mitigate sensor-based privacy concerns (ex. pose quantization and position bounds) and which do not include user-configured data that could be used for profiling.
+
+## Note
+There is no distinction between different WebXR modes in this document. Data access requirements are the same whether the session is inline, immersive, or otherwise. If a user agent wants to avoid user consent for a particular type of session, the user agent should meet the requirements for all data available in that session. _For example, if in an inline session a user agent only supports the [viewer](https://immersive-web.github.io/webxr/#dom-xrreferencespacetype-viewer) reference space, does not support other forms of sensor-based data (e.g. from a 6DOF controller), and does not support multiple views, then all privacy requirements below have been met and user consent is not required for that session._
 
 
 ## Privacy Requirements
