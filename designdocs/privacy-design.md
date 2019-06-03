@@ -5,6 +5,8 @@ Further, when allowing access to any sensor-based data (ex. poses) or user confi
 
 In some scenarios, mitigations may not be sufficient to ensure user privacy. In those situations, user consent is required. For example, user consent is always required when exposing data that might allow a site to profile the user. A summary of scenarios where user consent is required can be found under [User Communication](#user-communication).
 
+Further, some mitigations are always required even if user consent is obtained (ex. focused and visible is always required before exposing pose data).
+
 User consent must be requested only in response to requestSession(). It is recommended that consent last as long as the browsing context. User consent cannot be obtained during an active session, as there is no known approach for a trusted user interface that works consistently across all platforms during an active session.
 
 When creating a session, all privacy-sensitive data that could be exposed during that session must be considered when determining whether or not user consent is required. If user consent is not granted for a particular data type, then either:
@@ -37,7 +39,7 @@ The **_mandatory conditions_** for [XRSession](https://immersive-web.github.io/w
 *   User consent is required before creating an [XRSession](https://immersive-web.github.io/webxr/#xrsession-interface) on a device with configurable interpupillary distance (IPD), if subsequent calls to [XRFrame.getViewerPose()](https://immersive-web.github.io/webxr/#dom-xrframe-getviewerpose) will return [XRView.transform](https://immersive-web.github.io/webxr/#dom-xrview-transform)s that can be used to compute the configured IPD.
 *   User consent is required before creating an [XRSession](https://immersive-web.github.io/webxr/#xrsession-interface) if the user agent does not otherwise [mitigate](#providing-xrviewerpose-data) [sensor fingerprinting threats](https://github.com/immersive-web/privacy-and-security/blob/master/POSE-AND-ENVIRONMENT.md#user-fingerprinting) through data access to [XRViewerPose](https://immersive-web.github.io/webxr/#xrviewerpose-interface) or [XRPose](https://immersive-web.github.io/webxr/#xrpose-interface).
 
-If user consent is required, it must be obtained as part of the [XRRequestSession](https://immersive-web.github.io/webxr/#dom-xr-requestsession) algorithm before the new [XRSession](https://immersive-web.github.io/webxr/#xrsession-interface) object is created. If consent is not obtained, the user agent MUST [reject](https://www.w3.org/2001/tag/doc/promises-guide/#reject-promise) the promise with a "[SecurityError](https://heycam.github.io/webidl/#securityerror)" [DOMException](https://heycam.github.io/webidl/#idl-DOMException).
+If user consent is required, it must be obtained as part of the [XRRequestSession](https://immersive-web.github.io/webxr/#dom-xr-requestsession) algorithm before the new [XRSession](https://immersive-web.github.io/webxr/#xrsession-interface) object is created. If the required consent is not obtained, the user agent MUST [reject](https://www.w3.org/2001/tag/doc/promises-guide/#reject-promise) the promise with a "[SecurityError](https://heycam.github.io/webidl/#securityerror)" [DOMException](https://heycam.github.io/webidl/#idl-DOMException).
 
 ```
 Editor Note: The paragraph above suggests specific changes to the XRSession algorithm language.
