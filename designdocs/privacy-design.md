@@ -1,5 +1,5 @@
 ## Note
-This document was used as background for the [Privacy and Security Explainer](privacy-security-explainer.md) and has been superseded by that explainer.
+This document was used as background for the [Privacy and Security Explainer](../privacy-security-explainer.md) and has been superseded by that explainer.
 
 ## Summary
 This design adopts the [requirements of the Generic Sensors API](https://www.w3.org/TR/generic-sensor/#concepts-can-expose-sensor-readings) when exposing data based on sensors.
