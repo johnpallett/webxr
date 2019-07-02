@@ -1,3 +1,6 @@
+## Note
+This document was used as background for the [Privacy and Security Explainer](https://github.com/immersive-web/webxr/blob/master/privacy-security-explainer.md) and has been superseded by that explainer.
+
 ## Summary
 This design adopts the [requirements of the Generic Sensors API](https://www.w3.org/TR/generic-sensor/#concepts-can-expose-sensor-readings) when exposing data based on sensors.
 
