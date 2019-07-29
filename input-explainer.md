@@ -16,7 +16,7 @@ Tracked pointers are input sources able to be tracked separately from the viewer
 #### Screen
 Screen based input is driven by mouse and touch interactions on a 2D screen that are then translated into a 3D targeting ray. The targeting ray originates at the interacted point on the screen as mapped into the input `XRSpace` and extends out into the scene along a line from the screen's viewer pose position through that point. The specific mapped depth of the origin point depends on the user agent. It SHOULD correspond to the actual 3D position of the point on the screen where available, but MAY also be projected onto the closest clipping plane (defined by the smaller of the `depthNear` and `depthFar` attributes of the `XRSession`) if the actual screen placement is not known.
 
-To accomplish this, pointer events over the relevant screen regions are monitored and temporary input sources are generated in response to allow unified input handling. For inline sessions with an `outputContext`, the monitored region is the `outputContext`'s canvas. For immersive sessions (e.g. hand-held AR), the entire screen is monitored. 
+To accomplish this, pointer events over the relevant screen regions are monitored and temporary input sources are generated in response to allow unified input handling. For inline sessions the monitored region is the canvas associated with the `baseLayer`. For immersive sessions (e.g. hand-held AR), the entire screen is monitored. 
 
 ### Selection styles
 In addition to a targeting ray, all input sources provide a mechanism for the user to perform a "select" action. This user intent is communicated to developers through events which are discussed in detail in the [Input events](#input-events) section. The physical action which triggers this selection will differ based on the input type. For example (though this is hardly conclusive):
@@ -31,10 +31,10 @@ In addition to a targeting ray, all input sources provide a mechanism for the us
 ## Basic usage
 
 ### Enumerating input sources
-Calling the `getInputSources()` function on an `XRSession` will return a list of all `XRInputSource`s that the user agent considers active. The properties of an `XRInputSource` object are immutable. If a device can be manipulated in such a way that these properties can change, the `XRInputSource` will be removed from the array and a new entry created.
+The `inputSources` attribute on an `XRSession` returns a list of all `XRInputSource`s that the user agent considers active. The properties of an `XRInputSource` object are immutable. If a device can be manipulated in such a way that these properties can change, the `XRInputSource` will be removed from the array and a new entry created.
 
 ```js
-let inputSources = xrSession.getInputSources();
+let inputSources = xrSession.inputSources;
 ```
 
 When input sources are added to or removed from the list of available input sources the `inputsourceschange` event must be fired on the `XRSession` object to indicate that any cached copies of the list should be refreshed. In addition, the `inputsourceschange` event will also fire once after the session creation callback completes. This event is of the type `XRInputSourceChangeEvent` and will contain three attributes: `session` is associated session being changed, `added` is the new input sources, and `removed` is the input sources that will no longer be reported.
@@ -50,7 +50,7 @@ function onSessionStarted(session) {
 
 let xrInputSources = null;
 function onInputSourcesChange(event) {
-  xrInputSources = event.session.getInputSources();
+  xrInputSources = event.session.inputSources;
 }
 ```
 
@@ -89,10 +89,10 @@ function onSessionStarted(session) {
 }
 ```
 
-All three events are `XRInputSourceEvent` events. When fired the event's `inputSource` attribute will contain the `XRInputSource` that produced the event. The event's `frame` attribute will contain a valid `XRFrame` that can be used to call `getPose()` at the time the selection event occurred. Calling the frame's `getViewerPose()` method will throw an `InvalidState` error. (The viewer's pose can still be queried by passing the `XRSession`'s `viewerSpace` to `XRFrame.getPose()`.)
+All three events are `XRInputSourceEvent` events. When fired the event's `inputSource` attribute will contain the `XRInputSource` that produced the event. The event's `frame` attribute will contain a valid `XRFrame` that can be used to call `getPose()` at the time the selection event occurred. Calling the frame's `getViewerPose()` method will throw an `InvalidState` error. (The viewer's pose can still be queried by passing an `XRReferenceSpace` of type `viewer` to `XRFrame.getPose()`.)
 
 ### Transient input sources
-Some input sources are only be added to the list of input sources while an action is occurring. For example, those with an `targetRayMode` of 'screen' or those with `targetRayMode` of 'gaze' which are triggered by a voice command. In these cases, `XRInputSource` is only present in the array returned by `getInputSources()` during the lifetime of the action. In this circumstance, the order of events is as follows:
+Some input sources are only be added to the list of input sources while an action is occurring. For example, those with an `targetRayMode` of 'screen' or those with `targetRayMode` of 'gaze' which are triggered by a voice command. In these cases, `XRInputSource` is only present in the `inputSources` array during the lifetime of the action. In this circumstance, the order of events is as follows:
 1. Optionally `pointerdown`
 1. `inputsourceschange` for add
 1. `selectstart`
@@ -106,7 +106,7 @@ Some input sources are only be added to the list of input sources while an actio
 Input sources that are instantaneous, without a clear start and end point such as a verbal command like "Select", will still fire all events in the sequence.
 
 ### Choosing a preferred input source
-Many platforms support multiple input sources concurrently. Examples of this are left/right handed motion controllers or hand tracking combined with a 0DOF clicker. Since `xrSession.getInputSources()` returns all connected input sources, an application may choose to take into consideration the most recently used input sources when rendering UI hints, such as a cursor, ray or highlight.
+Many platforms support multiple input sources concurrently. Examples of this are left/right handed motion controllers or hand tracking combined with a 0DOF clicker. Since `xrSession.inputSources` returns all connected input sources, an application may choose to take into consideration the most recently used input sources when rendering UI hints, such as a cursor, ray or highlight.
 
 To simplify the sample code throughout this explainer, an example is provided which shows one potential way to set a `preferredInputSource`.
 
@@ -120,7 +120,7 @@ function onSelectStart(event) {
 }
 
 function onInputSourceChanged(event) {
-  xrInputSources = event.session.getInputSources();
+  xrInputSources = event.session.inputSources;
 
   // Choose an appropriate default from available inputSources, such as 
   // prioritizing based on the value of targetRayMode: 'screen' over 
@@ -228,21 +228,35 @@ For `tracked-pointer` input sources, it is often appropriate for the application
 #### Choosing renderable models
 The majority of `tracked-pointer` input sources will have a non-null `gamepad` attribute on the `XRInputSource` object. The `Gamepad`'s `id` is used to determine what should be rendered if the app intends to visualize the input source itself, rather than an alternative virtual object. (See the section on [Button and Axis State](#button-and-axis-state) for more details.)
 
-The WebXR Device API currently does not offer any way to retrieve renderable resources that represent the input devices from the API itself, and as such the `Gamepad`'s `id` must be used as a key to load an appropriate resources from the application's server or a CDN. The example below presumes that the `getInputSourceRenderableModel` call would do the required lookup and caching.
+The WebXR Device API currently does not offer any way to retrieve renderable resources that represent the input devices from the API itself, and as such the `XRInputSource`'s `profiles` must be used to identify and load an appropriate resources. (For example, from the application's server, a CDN, or a local cache.) The `profiles` provides a list of strings that identify the device, given in descending order of preference.
+
+For example, the Samsung Odyssey controller is a variant of the standard Windows Mixed Reality controller. As a result, the `profiles` for that controller could be:
+
+```js
+// Exact strings are examples only.
+["samsung-odyssey", "windows-mixed-reality", "touchpad-thumbstick-controller"]
+```
+
+Applications should iterate through the list until a string is located that corresponds to a known model, which should then be used when rendering the input device. The example below presumes that the `getInputSourceRenderableModel` call would do the required lookup and caching.
 
 ```js
 function loadRenderableInputModels(xrInputSource) {
-  // Don't load renderable models if the input source doesn't have a gamepad. 
-  if (!inputSource.gamepad)
-    return;
+  for (let profile of xrInputSource.profiles) {
+    // Retrieve a mesh to render based on the gamepad object's profile and handedness
+    let renderableModel = getInputSourceRenderableModel(profile, xrInputSource.handedness);
+    
+    if (renderableModel) {
+      // Add the model to the imaginary 3D engine's scene.
+      scene.inputObjects.add(renderableModel, xrInputSource);
+      return;
+    }
+  }
 
-  // Retrieve a mesh to render based on the gamepad object's id and handedness
-  let renderableModel = getInputSourceRenderableModel(inputSource.gamepad.id, inputSource.handedness);
-  if (!renderableModel)
-    return;
-
-  // Add the model to the imaginary 3D engine's scene.
-  scene.inputObjects.add(renderableModel, xrInputSource);
+  // If the profiles list was empty or a corresponding model could not be found
+  // for any entry in it the application could respond by not rendering the
+  // device at all or rendering a generic device that is not intended to be a
+  // visual match. This sample chooses the latter approach.
+  scene.inputObjects.add(getDefaultInputSourceRenderableModel(), xrInputSource);
 }
 ```
 
@@ -285,19 +299,11 @@ Examples of input sources that may expose their state this way include Oculus To
 `Gamepad` instances reported in this way have several notable behavioral changes vs. the ones reported by `navigator.getGamepads()`:
 
   - `Gamepad` instances connected to an `XRInputSource` must not be included in the array returned by `navigator.getGamepads()`.
+  - The `Gamepad`'s `id` attribute must be `""` (empty string).
   - The `Gamepad`'s `index` attribute must be `-1`.
   - The `Gamepad`'s `connected` attribute must be `true` unless the related `XRInputSource` is removed from the `inputSources` array or the related `XRSession` is ended.
 
-Finally, the `id` attribute for `Gamepad`s surfaced by the WebXR API are more strictly formatted than those of traditional gamepads in order to make them a more appropriate key for determining rendering assets.
-
-  - The `id` MAY be `'unknown'` if the type of input source cannot be reliably identified or the UA determines that the input source type must be masked for any reason. Applications should render a generic input device in this case.
-  - Inline sessions MUST only expose `id`s of `'unknown'`.
-  - Otherwise the `id` must be a lower-case string that describes the physical input source.
-    - The exact format is [still under discussion](https://github.com/immersive-web/webxr/issues/550), but will probably need to include at least an indication of the input device's manufacturer and model. (Such as `oculus-touch`)
-    - It must not include an indication of the handedness of the input source (such as `oculus-touch-left`), as that can be determined from the `handedness` attribute.
-    - UAs SHOULD make an effort to align on the strings that are returned for any given device.
-
-All other attributes behave as described in the [Gamepad](https://w3c.github.io/gamepad/) specification.
+The exact button and axes layout is given by the `XRInputSource`'s `profiles` attribute, which contains an array of strings that identify the button and axes layout or subsets of it, ordered from most specific to least specific.
 
 ```js
 function onXRFrame(timestamp, frame) {
@@ -307,7 +313,7 @@ function onXRFrame(timestamp, frame) {
   if (inputSource && inputSource.gamepad) {
     let gamepad = inputSource.gamepad;
     
-    // Use joystick or touchpad values for movement.
+    // Use touchpad values for movement.
     if (gamepad.axes.length >= 2) {
       MoveUser(gamepad.axes[0], gamepad.axes[1]);
     }
@@ -324,37 +330,36 @@ function onXRFrame(timestamp, frame) {
 }
 ```
 
-If the application includes interactions that require user activation (such as starting media playback), the application can listen to the `XRInputSource`s `select` events, which fire for every pressed and released button on the controller. When triggered by a controller input, the `XRInputSourceEvent` will include a `buttonIndex` other than `-1` to indicate which button on the gamepad triggered the event.
+If the application includes interactions that require user activation (such as starting media playback), the application can listen to the `XRInputSource`s `select` events, which fire for the primary button on the controller.
 
 The UA may update the `gamepad` state at any point, but it must remain constant while running a batch of `XRSession` `requestAnimationFrame` callbacks or event callbacks which provide an `XRFrame`.
 
 ### XR gamepad mapping
 
-The WebXR Device API also introduces a new standard controller layout indicated by the `mapping` value of `xr-standard`. (Additional mapping variants may be added in the future if necessary.) This defines a specific layout for the inputs most commonly found on XR controller devices today. The following table describes the buttons/axes and their physical locations:
+The WebXR Device API also introduces a new standard controller layout indicated by the `mapping` value of `xr-standard`. (Additional mapping variants may be added in the future if necessary.) This defines a specific layout for the inputs most commonly found on XR controller devices today. The following table describes the buttons/axes and their associated physical inputs:
 
-| Button     | `xr-standard` Location            |
-| ---------- | --------------------------------- |
-| buttons[0] | Primary trigger                   |
-| buttons[1] | Primary Touchpad/Joystick click   |
-| buttons[2] | Grip/Secondary trigger            |
-| buttons[3] | Secondary Touchpad/Joystick click |
+| Button     | `xr-standard` Mapping    |
+| ---------- | -------------------------|
+| buttons[0] | Primary button/trigger   |
+| buttons[1] | Secondary button/trigger |
+| buttons[2] | Touchpad press           |
+| buttons[3] | Thumbstick press         |
 
-| Axis    | `xr-standard` Location        |
-| ------- | ----------------------------- |
-| axes[0] | Primary Touchpad/Joystick X   |
-| axes[1] | Primary Touchpad/Joystick Y   |
-| axes[2] | Secondary Touchpad/Joystick X |
-| axes[3] | Secondary Touchpad/Joystick Y |
+| Axis    | `xr-standard` Mapping |
+| ------- | ----------------------|
+| axes[0] | Touchpad X            |
+| axes[1] | Touchpad Y            |
+| axes[2] | Thumbstick X          |
+| axes[3] | Thumbstick Y          |
 
-Additional device-specific inputs may be exposed after these reserved indices, but devices that lack one of the canonical inputs must still preserve their place in the array. If a device has both a touchpad and a joystick the UA should designate one of them to be the primary axis-based input and expose the other at axes[2] and axes[3] with an associated button at button[3].
+Additional device-specific inputs may be exposed after these reserved indices, but devices that lack one of the canonical inputs must still preserve their place in the array.
 
 In order to make use of the `xr-standard` mapping, a device must meet **at least** the following criteria:
 
  - Is a `tracked-pointer` device. 
- - Has a trigger or similarly accessed button
- - Has at least one touchpad or joystick
+ - Has a trigger or similarly accessed button separate from any touchpads or thumbsticks
 
-devices that lack one of those elements may still expose `gamepad` data, but must not claim the `xr-standard` mapping. For example: The controls on the side of a Gear VR would not qualify for the `xr-standard` mapping because they represent a `gaze`-style input. Similarly, a Daydream controller would not qualify for the `xr-standard` mapping since it lacks a trigger.
+devices that do not meet that criteria may still expose `gamepad` data, but must not claim the `xr-standard` mapping. For example: The controls on the side of a Gear VR would not qualify for the `xr-standard` mapping because they represent a `gaze`-style input. Similarly, a Daydream controller would not qualify for the `xr-standard` mapping since it lacks a trigger.
 
 ### Exposing button/axis values with action maps
 
@@ -362,17 +367,31 @@ Some native APIs rely on what's commonly referred to as an "action mapping" syst
 
 When using an API that limits reading controller input to use of an action map, it is suggested that a mapping be created with one action per possible input, given the same name as the target input. For example, an similar mapping to the following may be used for each device:
 
-| Button/Axis | Action name      | Sample binding            |
-|-------------|------------------|---------------------------|
-| button[0]   | "trigger"        | "[device]/trigger"        |
-| button[1]   | "touchpad-click" | "[device]/touchpad/click" |
-| button[2]   | "grip"           | "[device]/grip"           |
-| axis[0]     | "touchpad-x"     | "[device]/touchpad/x"     |
-| axis[1]     | "touchpad-y"     | "[device]/touchpad/y"     |
+| Button/Axis | Action name        | Sample binding              |
+|-------------|--------------------|-----------------------------|
+| button[0]   | "trigger"          | "[device]/trigger"          |
+| button[1]   | "grip"             | "[device]/grip"             |
+| button[2]   | "touchpad-click"   | "[device]/touchpad/click"   |
+| button[3]   | "thumbstick-click" | "[device]/thumbstick/click" |
+| axis[0]     | "touchpad-x"       | "[device]/touchpad/x"       |
+| axis[1]     | "touchpad-y"       | "[device]/touchpad/y"       |
+| axis[2]     | "thumbstick-x"     | "[device]/thumbstick/x"     |
+| axis[3]     | "thumbstick-y"     | "[device]/thumbstick/y"     |
 
 If the API does not provided a way to enumerate the available input devices, the UA should provide bindings for the left and right hand instead of a specific device and expose a `Gamepad` for any hand that has at least one non-`null` input.
 
 The UA must not make any attempt to circumvent user remapping of the inputs.
+
+### Generic Profiles
+
+The strings returned in the `profiles` array of an `XRInputSource` describe the device being used with varying levels of detail, ranging from exactly identifying the device to only giving a broad description of it's shape and capabilities. It's highly recommended that, when applicable, the last profile in the array be from a list of well-known "generic" profiles, given below.
+
+ - **"button-controller":** A controller with at least one button/trigger but no touchpad or thumbstick. Controllers with this profile must use the `xr-standard` Gamepad mapping.
+ - **"touchpad-controller"** A controller with a touchpad, but no thumbstick. If the controller also has at least one additional button or trigger it must use the `xr-standard` Gamepad mapping.
+ - **"thumbstick-controller"** A controller with a thumbstick, but no touchpad. If the controller also has at least one additional button or trigger it must use the `xr-standard` Gamepad mapping.
+ - **"touchpad-thumbstick-controller"** A controller with both a touchpad and a thumbstick. If the controller also has at least one additional button or trigger it must use the `xr-standard` Gamepad mapping.
+
+More generic profiles may be added to this list over time as new common form factors are observed.
 
 ## Appendix A: Proposed partial IDL
 This is a partial IDL and is considered additive to the core IDL found in the main [explainer](explainer.md).
@@ -382,7 +401,7 @@ This is a partial IDL and is considered additive to the core IDL found in the ma
 //
 
 partial interface XRSession {
-  FrozenArray<XRInputSource> getInputSources();
+  readonly attribute XRInputSourceArray inputSources;
   
   attribute EventHandler onselect;
   attribute EventHandler onselectstart;
@@ -413,6 +432,14 @@ interface XRInputSource {
   readonly attribute XRSpace targetRaySpace;
   readonly attribute XRSpace? gripSpace;
   readonly attribute Gamepad? gamepad;
+  readonly attribute FrozenArray<DOMString> profiles;
+};
+
+[SecureContext, Exposed=Window]
+interface XRInputSourceArray {
+  iterable<XRInputSource>;
+  readonly attribute unsigned long length;
+  getter XRInputSource(unsigned long index);
 };
 
 //
@@ -446,12 +473,10 @@ dictionary XRInputSourceChangeEventInit : EventInit {
 interface XRInputSourceEvent : Event {
   readonly attribute XRFrame frame;
   readonly attribute XRInputSource inputSource;
-  readonly attribute long buttonIndex;
 };
 
 dictionary XRInputSourceEventInit : EventInit {
   required XRFrame frame;
   required XRInputSource inputSource;
-  long buttonIndex = -1;
 };
 ```

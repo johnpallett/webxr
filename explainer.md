@@ -137,7 +137,7 @@ function beginXRSession() {
 }
 ```
 
-In this sample, the `beginXRSession` function, which is assumed to be run by clicking the "Enter VR" button in the previous sample, requests an `XRSession` that operates in `immersive-vr` mode. The `requestSession` method returns a promise that resolves to an `XRSession` upon success. When requesting a session, the capabilities that the returned session must have, including it's XR mode, are passed in via an `XRSessionCreationOptions` dictionary.
+In this sample, the `beginXRSession` function, which is assumed to be run by clicking the "Enter VR" button in the previous sample, requests an `XRSession` that operates in `immersive-vr` mode. The `requestSession` method returns a promise that resolves to an `XRSession` upon success. In addition to the `XRSessionMode`, developers may supply an `XRSessionInit` dictionary containing the capabilities that the returned session must have. For more information, see [Feature dependencies](#feature-dependencies).
 
 If `supportsSession` resolved for a given mode, then requesting a session with the same mode should be reasonably expected to succeed, barring external factors (such as `requestSession` not being called in a user activation event for an immersive session.) The UA is ultimately responsible for determining if it can honor the request.
 
@@ -145,7 +145,7 @@ Only one immersive session per XR hardware device is allowed at a time across th
 
 Once the session has started, some setup must be done to prepare for rendering.
 - An `XRReferenceSpace` should be created to establish a space in which `XRViewerPose` data will be defined. See the [Spatial Tracking Explainer](spatial-tracking-explainer.md) for more information.
-- An `XRLayer` must be created and set as the `XRSession`'s `renderState.baseLayer`. (`baseLayer` because future versions of the spec will likely enable multiple layers, at which point this would act like the `firstChild` attribute of a DOM element.)
+- An `XRWebGLLayer` must be created and set as the `XRSession`'s `renderState.baseLayer`. (`baseLayer` because future versions of the spec will likely enable multiple layers.)
 - Then `XRSession.requestAnimationFrame` must be called to start the render loop pumping.
 
 ```js
@@ -156,7 +156,7 @@ function onSessionStarted(session) {
   // Store the session for use later.
   xrSession = session;
 
-  xrSession.requestReferenceSpace({ type:'stationary', subtype:'eye-level' })
+  xrSession.requestReferenceSpace('local')
   .then((referenceSpace) => {
     xrReferenceSpace = referenceSpace;
   })
@@ -168,11 +168,11 @@ function onSessionStarted(session) {
 }
 ```
 
-### Setting up an XRLayer
+### Setting up an XRWebGLLayer
 
-The content to present to the device is defined by an `XRLayer`. In the initial version of the spec only one layer type, `XRWebGLLayer`, is defined and only one layer can be used at a time. This is set via the `XRSession`'s `updateRenderState()` function. `updateRenderState()` takes a dictionary containing new values for a variety of options affecting the session's rendering, including `baseLayer`. Only the options specified in the dictionary are updated.
+The content to present to the device is defined by an `XRWebGLLayer`. This is set via the `XRSession`'s `updateRenderState()` function. `updateRenderState()` takes a dictionary containing new values for a variety of options affecting the session's rendering, including `baseLayer`. Only the options specified in the dictionary are updated.
 
-Future iterations of the spec will define new types of `XRLayer`s. For example: a new layer type would be added to enable use with any new graphics APIs that get added to the browser. The ability to use multiple layers at once and have them composited by the UA will likely also be added in a future API revision.
+Future extensions to the spec will define new layer types. For example: a new layer type would be added to enable use with any new graphics APIs that get added to the browser. The ability to use multiple layers at once and have them composited by the UA will likely also be added in a future API revision.
 
 In order for a WebGL canvas to be used with an `XRWebGLLayer`, its context must be _compatible_ with the XR device. This can mean different things for different environments. For example, on a desktop computer this may mean the context must be created against the graphics adapter that the XR device is physically plugged into. On most mobile devices though, that's not a concern so the context will always be compatible. In either case, the WebXR application must take steps to ensure WebGL context compatibility before using it with an `XRWebGLLayer`.
 
@@ -180,7 +180,7 @@ When it comes to ensuring canvas compatibility there's two broad categories that
 
 **XR Enhanced:** The app can take advantage of XR hardware, but it's used as a progressive enhancement rather than a core part of the experience. Most users will probably not interact with the app's XR features, and as such asking them to make XR-centric decisions early in the app lifetime would be confusing and inappropriate. An example would be a news site with an embedded 360 photo gallery or video. (We expect the large majority of early WebXR content to fall into this category.)
 
-This style of application should call `WebGLRenderingContextBase`'s `makeXRCompatible()` method. This will set a compatibility bit on the context that allows it to be used. Contexts without the compatibility bit will fail when attempting to create an `XRLayer` with them. In the event that a context is not already compatible with the XR device the [context will be lost and attempt to recreate itself](https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.13) using the compatible graphics adapter. It is the page's responsibility to handle WebGL context loss properly, recreating any necessary WebGL resources in response. If the context loss is not handled by the page, the promise returned by `makeXRCompatible` will fail. The promise may also fail for a variety of other reasons, such as the context being actively used by a different, incompatible XR device.
+This style of application should call `WebGLRenderingContextBase`'s `makeXRCompatible()` method. This will set a compatibility bit on the context that allows it to be used. Contexts without the compatibility bit will fail when attempting to create an `XRWebGLLayer` with them. In the event that a context is not already compatible with the XR device the [context will be lost and attempt to recreate itself](https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.13) using the compatible graphics adapter. It is the page's responsibility to handle WebGL context loss properly, recreating any necessary WebGL resources in response. If the context loss is not handled by the page, the promise returned by `makeXRCompatible` will fail. The promise may also fail for a variety of other reasons, such as the context being actively used by a different, incompatible XR device.
 
 ```js
 let glCanvas = document.createElement("canvas");
@@ -277,27 +277,33 @@ function drawScene(view) {
 
 Because the `XRViewerPose` inherits from `XRPose` it also contains a `transform` describing the position and orientation of the viewer as a whole relative to the `XRReferenceSpace` origin. This is primarily useful for rendering a visual representation of the viewer for spectator views or multi-user environments.
 
-### Handling suspended sessions
+### Handling session visibility
 
-The UA may temporarily "suspend" a session at any time. While suspended a session has restricted or throttled access to the XR device state and may process frames slowly or not at all. Suspended sessions can be reasonably be expected to be resumed at some point, usually when the user has finished performing whatever action triggered the suspension in the first place.
+The UA may temporarily hide a session at any time. While hidden a session has restricted access to the XR device state and frames will not be processed. Hidden sessions can be reasonably be expected to be made visible again at some point, usually when the user has finished performing whatever action triggered the session to hide in the first place. This is not guaranteed, however, so applications should not rely on it.
 
-The UA may suspend a session if allowing the page to continue reading the headset position represents a security or privacy risk (like when the user is entering a password or URL with a virtual keyboard, in which case the head motion may infer the user's input), or if other content is obscuring the page's output.
+The UA may hide a session if allowing the page to continue reading the headset position represents a security or privacy risk (like when the user is entering a password or URL with a virtual keyboard, in which case the head motion may infer the user's input), or if content external to the UA is obscuring the page's output.
 
-While suspended the page may either refresh the XR device at a slower rate or not at all, and poses queried from the device may be less accurate. If the user is wearing a headset the UA is expected to present a tracked environment (a scene which remains responsive to user's head motion) when the page is being throttled to prevent user discomfort.
+In other situations the UA may also choose to keep the session content visible but "blurred", indicating that the session content is still visible but no longer in the foreground. While blurred the page may either refresh the XR device at a slower rate or not at all, poses queried from the device may be less accurate, and all input tracking will be unavailable. If the user is wearing a headset the UA is expected to present a tracked environment (a scene which remains responsive to user's head motion) or reproject the throttled content when the page is being throttled to prevent user discomfort.
 
-The application should continue requesting and drawing frames while suspended, but should not depend on them being processed at the normal XR hardware device framerate. The UA may use these frames as part of it's tracked environment or page composition, though they may be partially occluded, blurred, or otherwise manipulated. Additionally, poses queried while the session is suspended may not accurately reflect the XR hardware device's physical pose.
+The session should continue requesting and drawing frames while blurred, but should not depend on them being processed at the normal XR hardware device framerate. The UA may use these frames as part of it's tracked environment or page composition, though the exact presentation of frames produced by a blurred session will differ between platforms. They may be partially occluded, literally blurred, greyed out, or otherwise de-emphasized.
 
-Some applications may wish to respond to session suspension by halting game logic, purposefully obscuring content, or pausing media. To do so, the application should listen for the `blur` and `focus` events from the `XRSession`. For example, a 360 media player would do this to pause the video/audio whenever the UA has obscured it.
+Some applications may wish to respond to the session being hidden or blurred by halting game logic, purposefully obscuring content, or pausing media. To do so, the application should listen for the `visibilitychange` events from the `XRSession`. For example, a 360 media player would do this to pause the video/audio whenever the UA has obscured it.
 
 ```js
-xrSession.addEventListener('blur', xrSessionEvent => {
-  pauseMedia();
-  // Allow the render loop to keep running, but just keep rendering the last frame.
-  // Render loop may not run at full framerate.
-});
-
-xrSession.addEventListener('focus', xrSessionEvent => {
-  resumeMedia();
+xrSession.addEventListener('visibilitychange', xrSessionEvent => {
+  switch (xrSessionEvent.session.visibilityState) {
+    case 'visible':
+      resumeMedia();
+      break;
+    case 'visible-blurred':
+      pauseMedia();
+      // Allow the render loop to keep running, but just keep rendering the last
+      // frame. Render loop may not run at full framerate.
+      break;
+    case 'hidden':
+      pauseMedia();
+      break;
+  }
 });
 ```
 
@@ -365,102 +371,102 @@ function checkARSupport() {
 
 The UA may choose to present the immersive AR session's content via any type of display, including dedicated XR hardware (for devices like HoloLens or Magic Leap) or 2D screens (for APIs like [ARKit](https://developer.apple.com/arkit/) and [ARCore](https://developers.google.com/ar/)). In all cases the session takes exclusive control of the display, hiding the rest of the page if necessary. On a phone screen, for example, this would mean that the session's content should be displayed in a mode that is distinct from standard page viewing, similar to the transition that happens when invoking the `requestFullscreen` API. The UA must also provide a way of exiting that mode and returning to the normal view of the page, at which point the immersive AR session must end.
 
-## Rendering to the Page
+## Inline sessions
 
-There are a couple of scenarios in which developers may want to present content rendered with the WebXR Device API on the page instead of (or in addition to) a headset: Mirroring and inline rendering. Both methods display WebXR content on the page via a Canvas element with an `XRPresentationContext`. Like a `WebGLRenderingContext`, developers acquire an `XRPresentationContext` by calling the `HTMLCanvasElement` or `OffscreenCanvas` `getContext()` method with the context id of "xrpresent". The returned `XRPresentationContext` is permanently bound to the canvas.
+When authoring content to be viewed immersively, it may be beneficial to use an `inline` session to view the same content in a 2D browser window. Using an inline session enables content to use a single rendering path for both inline and immersive presentation modes. It also makes switching between inline content and immersive presentation of that content easier.
 
-An `XRPresentationContext` can only be supplied imagery by an `XRSession`, though the exact behavior depends on the scenario in which it's being used. The context is associated with a session by setting the `XRRenderState`'s `outputContext` to the desired `XRPresentationContext` object. An `XRPresentationContext` cannot be used with multiple `XRSession`s simultaneously, so when an `XRPresentationContext` is set as the `outputContext` for a session's `XRRenderState`, any session it was previously associated with will have it's `renderState.outputContext` set to `null`.
-
-### Mirroring
-
-On desktop devices, or any device which has an external display connected to it, it's frequently desirable to show what the user in the headset is seeing on the external display. This is usually referred to as mirroring.
-
-In order to mirror WebXR content to the page, the session's `renderState.outputContext` must be set to a `XRPresentationContext`. Once a valid `outputContext` has been set any content displayed on the headset will then be mirrored into the canvas associated with the `outputContext`.
-
-When mirroring only one eye's content will be shown, and it should be shown without any distortion to correct for headset optics. The UA may choose to crop the image shown, display it at a lower resolution than originally rendered, and the mirror may be multiple frames behind the image shown in the headset. The mirror may include or exclude elements added by the underlying XR system (such as visualizations of room boundaries) at the UA's discretion. Pages should not rely on a particular timing or presentation of mirrored content, it's really just for the benefit of bystanders or demo operators.
-
-The UA may also choose to ignore the `outputContext` on systems where mirroring is inappropriate, such as devices without an external display like mobile or all-in-one systems.
+A `XRWebGLLayer` created with an `inline` session will not allocate a new WebGL framebuffer but instead set the `framebuffer` attribute to `null`. That way when `framebuffer` is bound all WebGL commands will naturally execute against the WebGL context's default framebuffer and display on the page like any other WebGL content. When that layer is set as the `XRRenderState`'s `baseLayer` the inline session is able to render it's output to the page.
 
 ```js
-function beginXRSession() {
-  let mirrorCanvas = document.createElement('canvas');
-  let mirrorCtx = mirrorCanvas.getContext('xrpresent');
-  document.body.appendChild(mirrorCanvas);
-
-  navigator.xr.requestSession('immersive-vr')
+function beginInlineXRSession() {
+  // Request an inline session in order to render to the page.
+  navigator.xr.requestSession('inline')
       .then((session) => {
-        // A mirror context isn't required to render, so it's not necessary to
-        // wait for the updateRenderState promise to resolve before continuing.
-        // It may mean that a frame is rendered which is not mirrored.
-        session.updateRenderState({ outputContext: mirrorCtx });
+        // Inline sessions must have an appropriately constructed WebGL layer
+        // set as the baseLayer prior to rendering. (This code assumes the WebGL
+        // context has already been made XR compatible.)
+        let glLayer = new XRWebGLLayer(session, gl);
+        session.updateRenderState({ baseLayer: glLayer });
         onSessionStarted(session);
       })
       .catch((reason) => { console.log("requestSession failed: " + reason); });
 }
 ```
 
-### Inline sessions
-
-There are several scenarios where it's beneficial to render a scene whose view is controlled by device tracking within a 2D page. For example:
-
- - Using phone rotation to view panoramic content.
- - Taking advantage of 6DoF tracking on devices (like [Tango](https://get.google.com/tango/) phones) with no associated headset.
- - Making use of head-tracking features for devices like [zSpace](http://zspace.com/) systems.
-
-These scenarios can make use of inline sessions to render tracked content to the page. Using an inline session also enables content to use a single rendering path for both inline and immersive presentation modes. It also makes switching between inline content and immersive presentation of that content easier.
-
-The [`RelativeOrientationSensor`](https://w3c.github.io/orientation-sensor/#relativeorientationsensor) and [`AbsoluteOrientationSensor`](https://w3c.github.io/orientation-sensor/#absoluteorientationsensor) interfaces (see [Motion Sensors Explainer](https://w3c.github.io/motion-sensors/)) can be used to polyfill the first case.
-
-Similar to mirroring, to make use of this mode the  `XRRenderState`'s `outputContext` must be set. At that point content rendered to the `XRRenderState`'s `baseLayer` will be rendered to the canvas associated with the `outputContext`. The UA is also allowed to composite in additional content if desired. (In the future, if multiple `XRLayers` are used their composited result will be what is displayed in the `outputContext`.)
-
-Immersive and inline sessions can use the same render loop, but there are some differences in behavior to be aware of. Most importantly, inline sessions will not pump their render loop if they do not have a valid `outputContext`. Instead the session acts as though it has been [suspended](#handling-suspended-sessions) until a valid `outputContext` has been assigned.
-
 Immersive and inline sessions may run their render loops at at different rates. During immersive sessions the UA runs the rendering loop at the XR device's native refresh rate. During inline sessions the UA runs the rendering loop at the refresh rate of page (aligned with `window.requestAnimationFrame`.) The method of computation of `XRView` projection and view matrices also differs between immersive and inline sessions, with inline sessions taking into account the output canvas dimensions and possibly the position of the users head in relation to the canvas if that can be determined.
 
-Most instances of inline sessions will only provide a single `XRView` to be rendered, but UA may request multiple views be rendered if, for example, it's detected that that output medium of the page supports stereo rendering. As a result pages should always draw every `XRView` provided by the `XRFrame` regardless of what type of session has been requested.
-
-UAs may have different restrictions on inline sessions that don't apply to immersive sessions. For instance, the UA does not have to guarantee the availability of tracking data to inline sessions, and even when it does a different set of `XRReferenceSpace` types may be available to inline sessions versus immersive sessions.
-
-```js
-let inlineCanvas = document.createElement('canvas');
-let inlineCtx = inlineCanvas.getContext('xrpresent');
-document.body.appendChild(inlineCanvas);
-
-function beginInlineXRSession() {
-  // Request an inline session in order to render to the page.
-  navigator.xr.requestSession('inline')
-      .then((session) => {
-        // Inline sessions must have an output context prior to rendering, so
-        // it's a good idea to wait until the outputContext is confirmed to have
-        // taken effect before rendering.
-        session.updateRenderState({ outputContext: inlineCtx }).then(() => {
-          onSessionStarted(session);
-        });
-      })
-      .catch((reason) => { console.log("requestSession failed: " + reason); });
-}
-```
-
-The UA should not reject requests for an inline session unless the page's feature policy prevents it. `navigator.xr.supportsSession()` can still be used if a page wants to test if inline session are allowed.
-
-```js
-function checkInlineSupport() {
-  // Check to see if the page is allowed to request inline sessions.
-  return navigator.xr.supportsSession('inline')
-      .then(() => { console.log("Inline content is supported!"); })
-      .catch((reason) => { console.log("Inline content is blocked: " + reason); });
-}
-```
+`navigator.xr.supportsSession()` will always return `true` when checking the support of `"inline"` sessions.  The UA should not reject requests for an inline session unless the page's feature policy prevents it or unless a required feature is unavailable as described in [Feature dependencies](#feature-dependencies)). For example, the following use cases all depend on additional reference space types which would need to be enabled via the `XRSessionInit`:
+ - Using phone rotation to view panoramic content.
+ - Taking advantage of 6DoF tracking on devices with no associated headset, like [ARCore](https://developers.google.com/ar/) or [ARKit](https://developer.apple.com/arkit/) enabled phones. (Note that this is not the same as `immersive-ar` as it does not provide automatic camera composition)
+ - Making use of head-tracking features for devices like [zSpace](http://zspace.com/) systems.
 
 ## Advanced functionality
 
 Beyond the core APIs described above, the WebXR Device API also exposes several options for taking greater advantage of the XR hardware's capabilities.
 
+### Feature dependencies
+Once developers have mastered session creation and rendering, they will often be interested in using additional WebXR features that may not be universally available. While developers are generally encouraged to design for progressive enhancement, some experiences may have requirements on features that are not guaranteed to be universally available. For example, an experience which requires users to move around a large physical space, such as a guided tour, would not function on an Oculus Go because it is unable to provide an [`unbounded` reference space](spatial-tracking-explainer.md#unbounded-reference-space). If an experience is completely unusable without a specific feature, it would be a poor user experience to initialize the underlying XR platform and create a session only to immediately notify the user it won't work.
+
+Features may be unavailable for a number of reasons, among which is the fact not all devices which support WebXR can support the full set of features. Another consideration is that some features expose [sensitive information](privacy-security-explainer.md#sensitive-information) which may require a clear signal of [user intent](privacy-security-explainer.md#user-intent) before functioning. Any feature which requires this signal to be provided via [explicit consent](privacy-security-explainer.md#explicit-consent) must request this consent prior to the session being created. This ensures a consistent experience across all hardware form-factors, regardless of whether the UA has a [trusted immersive UI](privacy-security-explainer.md#trusted-immersive-ui) available.
+
+WebXR allows the following features to be requested:
+* `local`
+* `local-floor`
+* `bounded-floor`
+* `unbounded`
+
+This list is currently limited to a subset of reference space types, but in the future will expand to include additional features. Some potential future features under discussion that would be candidates for this list are: eye tracking, plane detection, geo alignment, etc.
+
+Developers communicate their feature requirements by categorizing them into one of the following sequences in the `XRSessionInit` that can be passed into `xr.requestSession()`:
+* **`requiredFeatures`** This feature must be available in order for the experience to function at all. If [explicit consent](privacy-security-explainer.md#explicit-consent) is necessary, users will be prompted in response to `xr.requestSession()`. Session creation will be rejected if the feature is unavailable for the XR device, if the UA determines the user does not wish the feature enabled, or if the UA does not recognize the feature being requested. 
+* **`optionalFeatures`** The experience would like to use this feature for the entire session, but can function without it. Again, if [explicit consent](privacy-security-explainer.md#explicit-consent) is necessary, users will be prompted in response to `xr.requestSession()`. However, session creation will succeed regardless of the feature's hardware support or user intent. Developers must not assume optional features are available in the session and check the result from attempting to use them.
+
+(NOTE: `xr.supportsSession()` does not accept an `XRSessionInit` parameter and supplying one will have no effect)
+
+The following sample code represents the likely behavior of the guided tour example above. It depends on having an [`unbounded` reference space](spatial-tracking-explainer.md#unbounded-reference-space) and will reject creating the session if not available.
+
+```js
+function onEnterARClick() {
+  navigator.xr.requestSession('immersive-ar', {
+    requiredFeatures: [ 'unbounded' ]
+  })
+  .then(onSessionStarted)
+  .catch(() => {
+    // Display message to the user explaining that the experience could not
+    // be started.
+  });
+}
+```
+
+The following sample code shows an inline experience that would prefer to use motion tracking if available, but will fall back to using touch/mouse input if not.
+
+```js
+navigator.xr.requestSession('inline', {
+  optionalFeatures: [ 'local' ]
+})
+.then(onSessionStarted);
+
+function onSessionStarted(session) {
+  session.requestReferenceSpace('local')
+  .then(onLocalReferenceSpaceCreated)
+  .catch(() => {
+    session.requestReferenceSpace('viewer').then(onViewerReferenceSpaceCreated);
+  });
+}
+```
+
+Some features recognized by the UA but not explicitly listed in these arrays will be enabled by default for a session. This is only done if the feature does not require a signal of [user intent](privacy-security-explainer.md#user-intent) nor impact performance or the behavior of other features when enabled. At this time, only the following features will be enabled by default:
+
+| Feature | Circumstances |
+| ------ | ------- |
+| `viewer` | Requested `XRSessionMode` is `inline`, `immersive-vr`, or `immersive-ar` |
+| `local` | Requested `XRSessionMode` is `immersive-vr` or `immersive-ar` |
+
 ### Controlling rendering quality
 
-While in immersive sessions, the UA is responsible for providing a framebuffer that is correctly optimized for presentation to the `XRSession` in each `XRFrame`. Developers can optionally request either the buffer size or viewport size be scaled, though the UA may not respect the request. Even when the UA honors the scaling requests, the result is not guaranteed to be the exact percentage requested.
+While in immersive sessions, the UA is responsible for providing a framebuffer that is correctly optimized for presentation to the `XRSession` in each `XRFrame`. Developers can optionally request the framebuffer size be scaled, though the UA may not respect the request. Even when the UA honors the scaling requests, the result is not guaranteed to be the exact percentage requested.
 
-The first scaling mechanism is done by specifying a `framebufferScaleFactor` at `XRWebGLLayer` creation time. Each XR device has a default framebuffer size, which corresponds to a `framebufferScaleFactor` of `1.0`. This default size is determined by the UA and should represent a reasonable balance between rendering quality and performance. It may not be the 'native' size for the device (that is, a buffer which would match the native screen resolution 1:1 at point of highest magnification). For example, mobile platforms such as GearVR or Daydream frequently suggest using lower resolutions than their screens are capable of to ensure consistent performance.
+Framebuffer scaling is done by specifying a `framebufferScaleFactor` at `XRWebGLLayer` creation time. Each XR device has a default framebuffer size, which corresponds to a `framebufferScaleFactor` of `1.0`. This default size is determined by the UA and should represent a reasonable balance between rendering quality and performance. It may not be the 'native' size for the device (that is, a buffer which would match the native screen resolution 1:1 at point of highest magnification). For example, mobile platforms such as GearVR or Daydream frequently suggest using lower resolutions than their screens are capable of to ensure consistent performance.
 
 If the `framebufferScaleFactor` is set to a number higher or lower than `1.0` the UA should create a framebuffer that is the default resolution multiplied by the given scale factor. So a `framebufferScaleFactor` of `0.5` would specify a framebuffer with 50% the default height and width, and so on. The UA may clamp the scale factor however it sees fit, or may round it to a desired increment if needed (for example, fitting the buffer dimensions to powers of two if that is known to increase performance.)
 
@@ -485,23 +491,7 @@ function setupNativeScaleWebGLLayer() {
   });
 ```
 
-This technique should be used carefully, since the native resolution on some headsets may be higher than the system is capable of rendering at a stable framerate without use of additional techniques such as foveated rendering. Also note that the UA's scale clamping is allowed to prevent the allocation of native resoltion framebuffers if it deems it necessary to maintain acceptable performance.
-
-The second scaling mechanism is to request a scaled viewport into the `XRWebGLLayer`'s `framebuffer`. For example, under times of heavy load the developer may choose to temporarily render fewer pixels. To do so, developers should call `XRWebGLLayer.requestViewportScaling()` and supply a value between 0.0 and 1.0. The UA may then respond by changing the `XRWebGLLayer`'s `framebuffer` and/or the `XRViewport` values in future XR frames. It is worth noting that the UA may change the viewports for reasons other than developer request, and that not all UAs will respect requested viewport changes; as such, developers must always query the viewport values on each XR frame.
-
-```js
-function onDrawFrame() {
-  // Draw the current frame
-
-  // In response to a performance dip, request the viewport be restricted
-  // to a percentage (ex: 50%) of the layer's actual buffer. This change
-  // will apply to subsequent rendering frames
-  layer.requestViewportScaling(0.5);
-
-  // Register for next frame callback
-  xrSession.requestAnimationFrame(onDrawFrame);
-}
-```
+This technique should be used carefully, since the native resolution on some headsets may be higher than the system is capable of rendering at a stable framerate without use of additional techniques such as foveated rendering. Also note that the UA's scale clamping is allowed to prevent the allocation of native resolution framebuffers if it deems it necessary to maintain acceptable performance.
 
 ### Controlling depth precision
 
@@ -559,7 +549,7 @@ function drawScene() {
 
 Whenever possible the matrices given by `XRView`'s `projectionMatrix` attribute should make use of physical properties, such as the headset optics or camera lens, to determine the field of view to use. Most inline content, however, won't have any physically based values from which to infer a field of view. In order to provide a unified render pipeline for inline content an arbitrary field of view must be selected.
 
-By default a vertical field of view of 0.5 radians (90 degrees) is used for inline sessions. The horizontal field of view can be computed from the vertical field of view based on the width/height ratio of the `outputContext`'s canvas.
+By default a vertical field of view of 0.5 radians (90 degrees) is used for inline sessions. The horizontal field of view can be computed from the vertical field of view based on the width/height ratio of the `XRWebGLLayer`'s associated canvas.
 
 If a different default field of view is desired, it can be specified by passing a new `inlineVerticalFieldOfView` value, in radians, to the `updateRenderState` method:
 
@@ -616,10 +606,15 @@ partial interface Navigator {
   readonly attribute XR xr;
 };
 
+dictionary XRSessionInit {
+  sequence<DOMString> requiredFeatures;
+  sequence<DOMString> optionalFeatures;
+}
+
 [SecureContext, Exposed=Window] interface XR : EventTarget {
   attribute EventHandler ondevicechange;
   Promise<void> supportsSession(XRSessionMode mode);
-  Promise<XRSession> requestSession(XRSessionMode mode);
+  Promise<XRSession> requestSession(XRSessionMode mode, optional XRSessionInit);
 };
 
 //
@@ -662,16 +657,14 @@ dictionary XRRenderStateInit {
   double depthNear;
   double depthFar;
   double inlineVerticalFieldOfView;
-  XRLayer? baseLayer;
-  XRPresentationContext? outputContext
+  XRWebGLLayer? baseLayer;
 };
 
 [SecureContext, Exposed=Window] interface XRRenderState {
   readonly attribute double depthNear;
   readonly attribute double depthFar;
   readonly attribute double? inlineVerticalFieldOfView;
-  readonly attribute XRLayer? baseLayer;
-  readonly attribute XRPresentationContext? outputContext;
+  readonly attribute XRWebGLLayer? baseLayer;
 };
 
 //
@@ -685,6 +678,7 @@ dictionary XRRenderStateInit {
 };
 
 enum XREye {
+  "none",
   "left",
   "right"
 };
@@ -710,8 +704,6 @@ enum XREye {
 // Layers
 //
 
-[SecureContext, Exposed=Window] interface XRLayer {};
-
 dictionary XRWebGLLayerInit {
   boolean antialias = true;
   boolean depth = true;
@@ -728,8 +720,7 @@ typedef (WebGLRenderingContext or
  Constructor(XRSession session,
              XRWebGLRenderingContext context,
              optional XRWebGLLayerInit layerInit)]
-interface XRWebGLLayer : XRLayer {
-  readonly attribute XRWebGLRenderingContext context;
+interface XRWebGLLayer {
   readonly attribute boolean antialias;
   readonly attribute boolean ignoreDepthValues;
 
@@ -738,7 +729,6 @@ interface XRWebGLLayer : XRLayer {
   readonly attribute WebGLFramebuffer framebuffer;
 
   XRViewport? getViewport(XRView view);
-  Promise<void> requestViewportScaling(double viewportScaleFactor);
 
   static double getNativeFramebufferScaleFactor(XRSession session);
 };
@@ -765,12 +755,5 @@ partial dictionary WebGLContextAttributes {
 
 partial interface WebGLRenderingContextBase {
     Promise<void> makeXRCompatible();
-};
-
-//
-// RenderingContext
-//
-[SecureContext, Exposed=Window] interface XRPresentationContext {
-  readonly attribute HTMLCanvasElement canvas;
 };
 ```
