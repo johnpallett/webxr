@@ -3,7 +3,21 @@
 The WebXR Device API enables developers to build content for AR and VR hardware that uses one or more sensors to infer information about the real world, and may then present information about the real world either to developers or directly to the end user. In such systems there are a wide range of input sensor types used (cameras, accelerometers, etc), and a variety of real-world data generated. This data is what allows web developers to author WebXR-based experiences. It also enables developers to infer information about users such as profiling them, fingerprinting their device, and input sniffing. Due to the nature of the Web, WebXR has a higher responsibility to protect users from malicious data usage than XR experiences delivered through closed ecosystem app stores.
 
 ### Sensitive information
-In the context of XR, sensitive information includes, but is not limited to, user configurable data such as interpupillary distance (IPD) and sensor-based data such as poses. All `immersive` sessions will expose some amount of sensitive data, due to the user's pose being necessary to render anything. However, in some cases, the same sensitive information will also be exposed via `inline` sessions. 
+In the context of XR, sensitive information includes, but is not limited to, user configurable data such as interpupillary distance (IPD) and sensor-based data such as poses. All `immersive` sessions will expose some amount of sensitive data, due to the user's pose being necessary to render anything. However, in some cases, the same sensitive information will also be exposed via `inline` sessions.
+
+### Device Fingerprinting
+The user agent must take steps (where possible) to prevent exposing data that is unique to the device. This is true even if consent has been obtained for other reasons. For example, even if user consent is obtained to expose IPD data (for reasons of user profiling) it is still in the user's best interests that the IPD data be anonymized to prevent fingerprinting.
+
+Some raw sensor data might be fingerprinted (e.g. IMU data) and thus on some user agents access to that raw sensor data outside of WebXR requires user consent. In cases where the same sensor fingerprinting risk exists for WebXR data, the user agent must either anonymize the data sufficiently to prevent the risk, otherwise [explicit consent](#explicit-consent) is strongly recommended.
+
+Specific approaches to mitigating device fingerprinting are up to the user agent who is best equipped to evaluate the actual threat on a given platform using the platform's APIs.
+
+### User Profiling
+[Explicit consent](#explicit-consent) is strongly recommended before exposing data that sites might use to reliably infer sensitive user characteristics (such as race, gender, or age) for some population of users. For example, [user-configured IPD data might allow a site to determine the age of some users](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.62.6181&rep=rep1&type=pdf). For sessions where the site might access IPD data, even if _most_ users couldn't be profiled, if _some_ users can be reliably profiled then [explicit consent](#explicit-consent) is strongly recommended in all cases.
+
+This explainer prioritizes highly the protection of sensitive user characteristics. If there is a reasonable possibility that a reliable signal for a sensitive characteristic exists, then [explicit consent](#explicit-consent) is strongly recommended.
+
+This recommendation is _not_ made in cases where data provides only a weak signal for all users, or where the information inferred is not particularly sensitive. For example, while the size of a user's room could (in theory) indicate a user's wealth, it might just as easily indicate that a user is at work; this ambiguity suggests the signal is unreliable and thus [explicit consent](#explicit-consent) is not strongly recommended.
 
 ### Private Browsing modes
 User agents may support a mode (e.g., private browsing) of operation intended to preserve user anonymity and/or ensure records of browsing activity are not persisted on the client.
@@ -112,6 +126,11 @@ For every call to `XRFrame.getPose()`, the UA must ensure that:
 * The `XRSession.visibility` is set to `visible` 
 * **TODO** address issues [#696](https://github.com/immersive-web/webxr/issues/696) and [#724](https://github.com/immersive-web/webxr/issues/724)
 
+---
+Note: On some systems it is possible that XRPose data may allow a site to fingerprint a device through sensor calibration data (ref: [1](https://www.ieee-security.org/TC/SP2019/papers/405.pdf), [2](https://arxiv.org/pdf/1605.08763.pdf), [3](https://arxiv.org/pdf/1503.01874.pdf)). This risk may vary depending upon hardware, operating system, and the methods used to generate pose data from sensors. User agents must either mitigate such fingerprinting risk, or be sure of user intent before exposing such data.
+
+---
+
 ### XRViewerPose
 The primary difference between `XRViewerPose` and `XRPose` is the inclusion of `XRView` information. More than one view may be present for a number of reasons. One example is a headset, which will generally have two views, but may have more to accommodate greater than 180 degree field of views. Another example is a CAVE system. In all cases, when more than one view is present and the physical relationship between these views is configurable by the user, the relationship between these views is considered sensitive information as it can be used to fingerprint or profile the user.
 
@@ -126,7 +145,12 @@ function onSessionRafCallback(XRFrame frame) {
 In addition to meeting the [`XRPose`](#xrpose) requirements, every call to `XRFrame.getViewerPose()` which will return more than one `XRView` must additionally ensure that:
 * User intention is well understood, either via [explicit consent](#explicit-consent) or [implied consent](#implied-consent)
 * If `XRView` data is affected by settings that may vary from device to device, such as static interpupillary distance, variations in screen geometry, or user-configured interpupillary distance, then the XRView data must be anonymized to prevent fingerprinting. Specific approaches to this are at the discretion of the user agent.
-* If `XRView` data is affected by a user-configured interpupillary distance, then it is strongly recommended that the UA required explicit consent during the creation of the `XRReferenceSpace` passed into `XRFrame.getViewerPose()`.
+* If `XRView` data is affected by a user-configured interpupillary distance, then it is strongly recommended that the UA required [explicit consent](#explicit-consent) during the creation of the `XRReferenceSpace` passed into `XRFrame.getViewerPose()`.
+
+---
+Note: Interpupillary distance may allow a site to reliably determine sensitive user characteristics such as [age, race and gender](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.62.6181&rep=rep1&type=pdf). It is strongly recommended that user agents seek [explicit consent](#explicit-consent) before exposing data where a site could learn the user's actual interpupillary distance. Given the sensitivity of this data, caution is advised when relying upon [implicit signals](#implied-consent).
+
+---
 
 ## Reference spaces
 ### Unbounded reference spaces
@@ -158,6 +182,10 @@ function onSessionCreated(session) {
   .catch( (e) => { /* handle gracefully */ } );
 }
 ```
+---
+Note: Unbounded coordinate systems may allow a site to determine the user's geographic location, for example by matching [trajectory data with known patterns such as roadways or paths](https://ieeexplore.ieee.org/document/8406600). It is strongly recommended that user agents seek [explicit consent](#explicit-consent) with an explanation that the user's location may be determined. Given the sensitivity of this data, caution is advised when relying upon [implicit signals](#implied-consent).
+
+---
 
 ### Bounded reference spaces
 Bounded reference spaces, when sufficiently constrained in size, do not enable developers to determine geographic location. However, because the floor level is established and users are able to walk around, it may be possible for a site to infer the user’s height or perform gait analysis, allowing user profiling and fingerprinting. In addition, it may be possible perform fingerprinting using the bounds reported by a bounded reference space.
@@ -203,6 +231,11 @@ In response, the UA must ensure that:
 
 If these requirements are not met, the promise returned from `XRSession.requestReferenceSpace()` must be rejected.
 
+---
+Note: Viewer height may allow a site to reliably determine sensitive user characteristics such as age. It is strongly recommended that user agents seek [explicit consent](#explicit-consent) while warning the user that their height may be determined. Given the sensitivity of this data, caution is advised when relying upon [implicit signals](#implied-consent).
+
+---
+
 ### Local-floor spaces
 On devices which support 6DoF tracking, `local-floor` reference spaces may be used to perform gait analysis, allowing user profiling and fingerprinting. In addition, because the `local-floor` reference spaces provide an established floor level, it may be possible for a site to infer the user’s height, allowing user profiling and fingerprinting.  
 
@@ -240,6 +273,11 @@ In response, the UA must ensure that:
 * All `XRPose` and `XRViewerPose` 6DoF pose data computed using a `local-floor` reference space is [limited](#limiting) to a reasonable distance from the reference space's native origin; the suggested default distance is 15 meters in each direction
 
 If these requirements are not met, the promise returned from `XRSession.requestReferenceSpace()` must be rejected.
+
+---
+Note: Viewer height may allow a site to reliably determine sensitive user characteristics such as age. It is strongly recommended that user agents seek [explicit consent](#explicit-consent) while warning the user that their height may be determined. Given the sensitivity of this data, caution is advised when relying upon [implicit signals](#implied-consent).
+
+---
 
 ### Local reference spaces
 On devices which support 6DoF tracking, `local` reference spaces may be used to perform gait analysis, allowing user profiling and fingerprinting.
